@@ -70,8 +70,8 @@ condition:
 action:
   - delay:
       hours: 0
-      minutes: 0
-      seconds: 10
+      minutes: !input delay_in_minutes
+      seconds: 0
       milliseconds: 0
   - service: number.set_value
     target:
