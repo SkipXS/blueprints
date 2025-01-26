@@ -8,6 +8,13 @@ blueprint:
       selector:
         entity:
           domain: climate
+    trv_calibration_number:
+      name: TRV Calibration Entity
+      description: Calibration
+      selector:
+        entity:
+          domain: number
+          device_class: temperature
     temperature_sensor:
       name: Temperature Sensor
       description: Sensor
@@ -15,13 +22,6 @@ blueprint:
         entity:
           domain: sensor
           device_class: temperature
-    trv_calibration_number:
-      name: TRV Calibration Entity
-      description: Calibration
-      selector:
-        entity:
-          domain: number
-          #device_class: temperature
     delay_in_seconds:
       name: Delay in seconds
       description: Your thermostat will take some time to update the current temperature after calibration. The delay should be higher than this time.
@@ -31,13 +31,22 @@ blueprint:
           min: 10
           max: 60
           step: 10
-    temp_diff_change:
-      name: Temperature difference to recalibrate
-      description: Some description
-      default: 0.2
+    hyst_diff_change:
+      name: Hysteresis Boost
+      description: Hysteresis Boost below target temperature
+      default: 0.5
       selector:
         number:
-          min: 0.1
+          min: 0.0
+          max: 1.0
+          step: 0.1
+    temp_diff_change:
+      name: Temperature difference to recalibrate
+      description: Only recalibrate if the difference is greater than this value
+      default: 0.0
+      selector:
+        number:
+          min: 0.0
           max: 1.0
           step: 0.1
 mode: restart
@@ -46,17 +55,12 @@ variables:
   trv: !input trv
   trv_calibration_number: !input trv_calibration_number
   temperature_sensor: !input temperature_sensor                                
+  hyst_diff_change: !input hyst_diff_change
   temp_diff_change: !input temp_diff_change
   
 trigger:
   - platform: state
     entity_id: !input trv
-    for:
-      hours: 0
-      minutes: 0
-      seconds: 0
-  - platform: state
-    entity_id: !input trv_calibration_number
     for:
       hours: 0
       minutes: 0
@@ -70,7 +74,7 @@ trigger:
 
 condition:
   - condition: template
-    value_template: '{{ state_attr(trv, "current_temperature") != None }}'
+    value_template: '{{ state_attr(trv, "current_temperature") != None and state_attr(trv, "temperature") != None}}'
   - condition: template
     value_template: '{{ states(trv_calibration_number) != "unavailable" and states(trv_calibration_number) != "unknown" }}'
   - condition: template
@@ -90,11 +94,16 @@ action:
             {% set room_temperature = states(temperature_sensor) | float | round(1) %}
             {% set trv_temperature = state_attr(trv, "current_temperature") | float | round(1) %}
             {% set trv_calibration = states(trv_calibration_number) | float | round(1) %}
-            
+            {% set trv_temperature_target = state_attr(trv, "temperature") | float | round(1) %}
+
             {% set offset_temp = (room_temperature - trv_temperature + trv_calibration | float) | round(1) %}
             
+            {% if trv_temperature_target > room_temperature -%}
+               {% set offset_temp = (offset_temp - hyst_diff_change | float) | round(1) %}
+            {%- endif %}
+
             {% set diff = (offset_temp - trv_calibration | float) | round(1) | abs %}
 
             {% if diff >= temp_diff_change -%}
-                {{(offset_temp | float)}}
+                {{(offset_temp)}}
             {%- endif %}
