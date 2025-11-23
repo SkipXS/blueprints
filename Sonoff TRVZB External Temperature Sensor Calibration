@@ -34,10 +34,10 @@ blueprint:
     If using Zigbee2MQTT, further configuration of the external temperature sensor may be required. By default, Zigbee2MQTT does not report back into Home Assistant if an entity's value has not changed, regardless of its reporting interval. To ensure this happens, the `force_update` setting on each external temperature sensor needs to be explicitly set. This is done by editing the Zigbee2MQTT `devices.yaml` file, as follows:
 
     ```
-	  '0x0ceff6fffedfa399':
-		  friendly_name: Thermometer Bad
-		  homeassistant:
-			  force_update: true
+    '0x0ceff6fffedfa399':
+      friendly_name: Thermometer Bad
+      homeassistant:
+        force_update: true
     ```
 
     By doing the above, the blueprint automation will be triggered by each report from the external temperature sensor, ensuring that fail-safe mode will not be activated on the TRV during a 2 hour period of constant temperature.
