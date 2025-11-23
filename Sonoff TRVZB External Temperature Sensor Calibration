@@ -1,0 +1,66 @@
+blueprint:
+  domain: automation
+  name: Sonoff TRVZB External Temperature Sensor Calibration
+  description: |
+    ## Sonoff TRVZB External Temperature Sensor Calibration (v1.0.1)
+    This blueprint synchronises the local temperature of one or more Sonoff TRVZBs with an external temperature sensor. Such behaviour might be required when an external temperature sensor more accurately reflects the room temperature compared with the internal temperature sensor in the TRV(s), or when you wish to use a single temperature sensor to control multiple radiators in a single room.
+
+    The network protocol of the external temperature sensor is irrelevant (it can be Zigbee, WiFi etc.), but the device must broadcast temperature updates at least once within 2 hours to prevent fail-safe mode from activating on the TRV (see below).
+
+    Functionality is similar to that of the Sonoff ZBBridge: whenever the external temperature sensor reports the temperature, the TRV is updated with the external temperature.
+
+    Before using this blueprint, each TRV must be explicitly configured to use an external temperature sensor (setting available in Zigbee2MQTT v2.1.2+).
+
+    ### Software Requirements
+    - Sonoff TRVZB Firmware: 1.2.1+
+    - A Zigbee integration that exposes the TRV external temperature input entity (e.g. Zigbee2MQTT v2.1.2+)
+
+    ### Required Entities in Home Assistant
+    - The external temperature sensor value
+    - The external temperature input entity of one or more Sonoff TRVZBs.
+
+    ### Fail-safe Mode
+    The Sonoff TRVZB has a built-in fail-safe mode whereby if the device has been configured to use an external temperature sensor and the external temperature has not been received by the device for more than 2 hours, the device will revert to using the internal temperature sensor. This behaviour protects against overheating/freezing in scenarios such as when the external temperature sensor is unavailable (e.g. flat battery) or if the automation created by this blueprint is disabled. When the TRV receives the next external temperature update, it switches back to using the external temperature sensor.
+    
+    Therefore this blueprint will be triggered once every hour.
+
+  input:
+    external_temperature_sensor:
+      name: External Temperature Sensor
+      description: The entity of the external temperature sensor device that represents the temperature value.
+      selector:
+        entity:
+          filter:
+            - domain: sensor
+              device_class: temperature
+
+    trv_external_temperature_input:
+      name: Sonoff TRVZB(s)
+      description: The entity of the Sonoff TRVZB device that represents the external temperature value.
+      selector:
+        entity:
+          multiple: true
+          filter:
+            - domain: number
+              device_class: temperature
+
+triggers:
+  - trigger: state
+    entity_id: !input external_temperature_sensor
+  - trigger: time_pattern # added to keep trvzb from falling back to internal sensor
+    hours: /1
+
+condition:
+  - condition: template
+    value_template: "{{ is_number(states(external_temperature_sensor)) }}"
+
+variables:
+  external_temperature_sensor: !input external_temperature_sensor
+
+actions:
+  - action: number.set_value
+    metadata: {}
+    data:
+      value: "{{ states(external_temperature_sensor) | float }}"
+      entity_id: !input trv_external_temperature_input
+mode: single
